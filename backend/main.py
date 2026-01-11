@@ -7,15 +7,13 @@ import numpy as np
 import re
 import io
 
-# Explicit Tesseract path (VERY IMPORTANT)
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+pytesseract.pytesseract.tesseract_cmd = r"/opt/homebrew/bin/tesseract"
 
 app = FastAPI()
 
-# Allow frontend connection
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # later restrict
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -23,24 +21,19 @@ app.add_middleware(
 
 @app.post("/api/ocr")
 async def run_ocr(file: UploadFile = File(...)):
-    # Read image
     image_bytes = await file.read()
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
-    # Convert to OpenCV
     open_cv_image = np.array(image)
     gray = cv2.cvtColor(open_cv_image, cv2.COLOR_RGB2GRAY)
 
-    # OCR
     extracted_text = pytesseract.image_to_string(gray)
-    signals = []        # default empty, frontend expects this
-    confidence = 95     # placeholder, can calculate later if you want
-    language = "English"  # placeholder
+    signals = []
+    confidence = 95
+    language = "English"
 
-    # Confidence heuristic
     text_confidence = min(98.0, 60 + len(extracted_text) * 0.1)
 
-    # Scam Signals
     signals = []
 
     if re.search(r"urgent|immediately|alert|warning", extracted_text, re.I):
@@ -65,8 +58,12 @@ async def run_ocr(file: UploadFile = File(...)):
         })
 
     return {
-    "text": extracted_text or "No readable text detected in image.",
-    "signals": signals,
-    "confidence": confidence,
-    "language": language
-}
+        "text": extracted_text or "No readable text detected in image.",
+        "signals": signals,
+        "confidence": text_confidence,
+        "language": language
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
